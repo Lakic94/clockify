@@ -27,7 +27,7 @@ import {
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchCalendars, fetchUser } from "./queries";
 
 export default function ProbaTest(oauth2Client: any) {
@@ -37,10 +37,10 @@ export default function ProbaTest(oauth2Client: any) {
   const [activeUserId, setActiveUserId] = useState<any>();
   const [inited, setInited] = useState(false);
   const [authToken, setAuthToken] = useState<any>();
+  const queryClient = useQueryClient();
 
   const searchParams = useSearchParams();
   const jwt = jwtDecode(searchParams?.get("auth_token") as string) as any;
-  console.log(jwt);
 
   const formSchema = z.object({
     timeEntry: z.boolean().default(false),
@@ -58,42 +58,22 @@ export default function ProbaTest(oauth2Client: any) {
   });
   form.watch();
 
-  // const { data: googleCalendars } = useQuery({
-  //   queryKey: ["calendars"],
-  //   queryFn: async () => {
-  //     axiosInstance
-  //       .get("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
-  //         headers: {
-  //           Authorization: `${token.token_type} ${token.access_token}`,
-  //         },
-  //       })
-  //       .then((res) => {
-  //         console.log(res);
-  //       })
-  //       .catch((e) => {
-  //         console.log(e);
-  //       });
-  //     return response.json();
-  //   },
-  //   staleTime: Infinity,
-  // });
-
-  const { data: supabaseUser } = useQuery({
+  const { data: supabaseUser, refetch: refetchSupabaseUser } = useQuery({
     queryKey: ["user"],
     queryFn: () => fetchUser(jwt.user),
     staleTime: Infinity,
     refetchInterval: false,
   });
-  console.log(supabaseUser);
+  // console.log(new Date(supabaseUser.provider.google.expiry_date));
 
-  const { data: userGoogleCalendars, fetchStatus } = useQuery({
-    queryKey: ["calendars"],
-    queryFn: () => fetchCalendars(supabaseUser),
-    staleTime: Infinity,
-    refetchInterval: false,
-    enabled: !!supabaseUser?.provider?.google,
-  });
-  console.log(userGoogleCalendars);
+  // const { data: userGoogleCalendars, fetchStatus } = useQuery({
+  //   queryKey: ["calendars"],
+  //   queryFn: () => fetchCalendars(supabaseUser),
+  //   staleTime: Infinity,
+  //   refetchInterval: false,
+  //   enabled: !!supabaseUser?.provider?.google,
+  // });
+  // console.log(userGoogleCalendars);
 
   let pca: PublicClientApplication;
   pca = new PublicClientApplication({
@@ -105,6 +85,53 @@ export default function ProbaTest(oauth2Client: any) {
   });
 
   let b: any;
+
+  const { data: googleCalendars, refetch: refetchGoogleCalendars } = useQuery({
+    queryKey: ["calendars"],
+    queryFn: async () => {
+      let scopedUser = queryClient.getQueryData(["user"]) as any;
+
+      if (scopedUser.provider?.google.expiry_date < new Date()) {
+        let response = await axiosInstance.post(
+          "https://herring-endless-firmly.ngrok-free.app/api/auth/refresh",
+          {
+            refreshToken: scopedUser.provider.google.refresh_token,
+          }
+        );
+        const supabase = createClient();
+        let newAuthObject = response.data;
+
+        let updatedUser = await supabase
+          .from("users")
+          .update({
+            provider: {
+              ...scopedUser.provider,
+              ...{ google: newAuthObject },
+            },
+          })
+          .eq("id", jwt.user as string)
+          .select("*");
+        if (updatedUser?.data) {
+          scopedUser = updatedUser.data[0];
+          queryClient.setQueryData(["user"], updatedUser.data[0]);
+        }
+      }
+      let response = axiosInstance.get(
+        "https://www.googleapis.com/calendar/v3/users/me/calendarList",
+        {
+          headers: {
+            Authorization: `${scopedUser.provider.google.token_type} ${scopedUser.provider.google.access_token}`,
+          },
+        }
+      );
+
+      return (await response).data;
+    },
+    staleTime: Infinity,
+    refetchInterval: false,
+    enabled: !!supabaseUser?.provider?.google,
+  });
+  console.log(googleCalendars);
 
   useEffect(() => {
     const initializeMsal = async () => {
@@ -145,19 +172,46 @@ export default function ProbaTest(oauth2Client: any) {
     //   });
   }, []);
 
-  useEffect(() => {
-    console.log("rerun");
-  }, []);
-
   const { instance, accounts, inProgress } = useMsal();
 
   const tet = useSearchParams();
+
+  async function azureLogin() {
+    await pca.initialize();
+    let a = await pca.loginPopup();
+    console.log(a);
+    const supabase = createClient();
+    const jwt = jwtDecode(searchParams.get("auth_token") as string) as any;
+
+    const exisingUser = await supabase
+      .from("users")
+      .select()
+      .eq("id", jwt.user as string);
+
+    if (exisingUser?.data) {
+      let updatedUser = await supabase
+        .from("users")
+        .update({
+          provider: {
+            ...exisingUser.data[0].provider,
+            ...{
+              azure: {
+                access_token: a.accessToken,
+              },
+            },
+          },
+        })
+        .eq("id", jwt.user as string)
+        .select("*");
+    }
+
+    refetchSupabaseUser();
+  }
 
   const googleLogin = useGoogleLogin({
     scope: "https://www.googleapis.com/auth/calendar",
     flow: "auth-code",
     onSuccess: async (codeResponse) => {
-      console.log(codeResponse);
       const tokens = await axiosInstance.post(
         "https://herring-endless-firmly.ngrok-free.app/api/auth",
         {
@@ -168,30 +222,24 @@ export default function ProbaTest(oauth2Client: any) {
       const supabase = createClient();
       const jwt = jwtDecode(searchParams.get("auth_token") as string) as any;
 
-      supabase
-        .from("users")
-        .select()
-        .eq("id", jwt.user as string)
-        .then(async (res) => {
-          console.log(res);
-          if (res.data?.length) {
-            console.log("no user");
+      const exisingUser = queryClient.getQueryData(["user"]) as any;
 
-            let a = await supabase
-              .from("users")
-              .update({
-                provider: {
-                  ...res.data[0].provider,
-                  ...{ google: tokens.data },
-                },
-              })
-              .eq("id", jwt.user as string);
+      if (exisingUser) {
+        const updatedUser = await supabase
+          .from("users")
+          .update({
+            provider: {
+              ...exisingUser.provider,
+              ...{ google: tokens.data },
+            },
+          })
+          .eq("id", jwt.user as string)
+          .select("*");
+        if (updatedUser?.data) {
+          queryClient.setQueryData(["user"], updatedUser.data[0]);
+        }
+      }
 
-            console.log(a);
-          }
-        });
-
-      console.log(tokens);
       setToken(tokens.data);
     },
     onError: (errorResponse) => console.log(errorResponse),
@@ -397,38 +445,6 @@ export default function ProbaTest(oauth2Client: any) {
       });
   }
 
-  async function azureLogin() {
-    await pca.initialize();
-    let a = await pca.loginPopup();
-    console.log(a);
-    const supabase = createClient();
-    const jwt = jwtDecode(searchParams.get("auth_token") as string) as any;
-
-    supabase
-      .from("users")
-      .select()
-      .eq("id", jwt.user as string)
-      .then(async (res) => {
-        console.log(res);
-        if (res.data?.length) {
-          console.log("no user");
-          await supabase
-            .from("users")
-            .update({
-              provider: {
-                ...res.data[0].provider,
-                ...{
-                  azure: {
-                    access_token: a.accessToken,
-                  },
-                },
-              },
-            })
-            .eq("id", jwt.user as string);
-        }
-      });
-  }
-
   function onSubmit(data: z.infer<typeof formSchema>) {
     console.log(data);
   }
@@ -502,15 +518,15 @@ export default function ProbaTest(oauth2Client: any) {
           <Button
             onClick={googleLogin}
             className={`${
-              activeUser && activeUser?.provider?.google
+              supabaseUser && supabaseUser?.provider?.google
                 ? "bg-blue-600"
                 : "bg-green-600"
             }`}
           >
-            {" "}
-            {activeUser && activeUser?.provider?.google
+            {supabaseUser && supabaseUser?.provider?.google
               ? "Connected"
               : "Connect"}
+            {void console.log(supabaseUser)}
           </Button>
         </div>
         <div className="flex flex-col gap-4">
@@ -534,12 +550,12 @@ export default function ProbaTest(oauth2Client: any) {
           <Button
             onClick={azureLogin}
             className={`${
-              activeUser && activeUser?.provider?.google
+              supabaseUser && supabaseUser?.provider?.azure
                 ? "bg-blue-600"
                 : "bg-green-600"
             }`}
           >
-            {activeUser && activeUser?.provider?.google
+            {supabaseUser && supabaseUser?.provider?.azure
               ? "Connected"
               : "Connect"}
           </Button>
@@ -567,7 +583,13 @@ export default function ProbaTest(oauth2Client: any) {
           <Button onClick={async () => {}}>Azure Login</Button>
         )}
         <Button onClick={check}>Check</Button>
-        <Button onClick={getCalendars}>List Calendars</Button>
+        <Button
+          onClick={() => {
+            refetchGoogleCalendars();
+          }}
+        >
+          List Calendars
+        </Button>
         <Button onClick={createCalendar}>Create Calendar</Button>
         <Button onClick={createEvent}>Create Event</Button>
         <Button onClick={getCalendar}>Get Calendar</Button>

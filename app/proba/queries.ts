@@ -32,33 +32,26 @@ export const fetchUser = async (jwt: string) => {
     .eq("id", jwt as string);
 
   if (!exisitingUser.data?.length) {
-    const createdUser = await supabase.from("users").insert({
-      id: jwt as string,
-      first_name: "test",
-    });
-    console.log(createdUser);
-
-    const newUser = await supabase
+    const createdUser = await supabase
       .from("users")
-      .select()
-      .eq("id", jwt as string);
-    return newUser;
+      .insert({
+        id: jwt as string,
+        first_name: "test",
+      })
+      .select("*");
+    if (createdUser.data?.length) {
+      localStorage.setItem(
+        "auth",
+        JSON.stringify(createdUser.data[0].provider)
+      );
+      return createdUser.data[0];
+    }
   }
-
-  return exisitingUser.data[0];
-  // .then(async (res) => {
-  //   console.log(res);
-  //   if (!res.data?.length) {
-  //     console.log("no user");
-
-  //     let a = await supabase.from("users").insert({
-  //       id: jwt as string,
-  //       first_name: "test",
-  //     });
-  //     console.log(a);
-  //   }
-  //   if (res.data) {
-  //     setActiveUser(res?.data[0]);
-  //   }
-  // });
+  if (exisitingUser.data?.length) {
+    localStorage.setItem(
+      "auth",
+      JSON.stringify(exisitingUser.data[0].provider)
+    );
+    return exisitingUser.data[0];
+  }
 };

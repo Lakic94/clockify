@@ -9,21 +9,23 @@ axiosInterceptorInstance.interceptors.request.use(
     console.log(config, "config da to je to");
     let accessToken = JSON.parse(localStorage.getItem("auth"));
     console.log(accessToken);
-    if (new Date(accessToken?.expiry_date ?? "") < new Date()) {
-      let response = await axios.post(
-        "https://herring-endless-firmly.ngrok-free.app/api/auth/refresh",
-        {
-          refreshToken: accessToken.refresh_token,
-        }
-      );
-      let newAuthObject = JSON.stringify(response.data);
-      localStorage.setItem("auth", newAuthObject);
-      accessToken = response.data;
-    }
+    const url = config.url.split("/api/")[1];
+    console.log(url);
+    // if (new Date(accessToken?.expiry_date ?? "") < new Date() && url !=='auth') {
+    //   let response = await axios.post(
+    //     "https://herring-endless-firmly.ngrok-free.app/api/auth/refresh",
+    //     {
+    //       refreshToken: accessToken.refresh_token,
+    //     }
+    //   );
+    //   let newAuthObject = JSON.stringify(response.data);
+    //   localStorage.setItem("auth", newAuthObject);
+    //   accessToken = response.data;
+    // }
 
-    if (accessToken) {
-      config.headers.Authorization = `${accessToken.token_type} ${accessToken.access_token}`;
-    }
+    // if (accessToken) {
+    //   config.headers.Authorization = `${accessToken.token_type} ${accessToken.access_token}`;
+    // }
     return config;
   },
   (error) => {
