@@ -24,11 +24,18 @@ import {
   FormItem,
   FormLabel,
 } from "@/components/ui/form";
-import { z } from "zod";
+import { any, z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchCalendars, fetchUser } from "./queries";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  fetchCalendars,
+  fetchClockifyUser,
+  fetchGoogleCalendars,
+  fetchUser,
+  timeEntriesSyncMutation,
+} from "./queries";
+import QueryTestComp from "@/components/quertTestComp";
 
 export default function ProbaTest(oauth2Client: any) {
   const [token, setToken] = useState<Credentials | null>();
@@ -40,40 +47,51 @@ export default function ProbaTest(oauth2Client: any) {
   const queryClient = useQueryClient();
 
   const searchParams = useSearchParams();
+
   const jwt = jwtDecode(searchParams?.get("auth_token") as string) as any;
 
   const formSchema = z.object({
-    timeEntry: z.boolean().default(false),
-    timeOff: z.boolean().default(false),
-    scheduledTime: z.boolean().default(false),
+    googleTimeEntry: z.boolean().default(false),
+    googleTimeOff: z.boolean().default(false),
+    googleScheduledTime: z.boolean().default(false),
   });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      timeEntry: false,
-      timeOff: false,
-      scheduledTime: false,
+      googleTimeEntry: false,
+      googleTimeOff: false,
+      googleScheduledTime: false,
     },
   });
-  form.watch();
 
-  const { data: supabaseUser, refetch: refetchSupabaseUser } = useQuery({
-    queryKey: ["user"],
-    queryFn: () => fetchUser(jwt.user),
+  const {
+    data: clockifyUser,
+    refetch: refetchClockifyUser,
+    isFetching: isLoadingClockifyUser,
+  } = useQuery({
+    queryKey: ["clockifyUser"],
+    queryFn: () =>
+      fetchClockifyUser(jwt, searchParams?.get("auth_token") as string),
     staleTime: Infinity,
     refetchInterval: false,
+    retry: 0,
   });
-  // console.log(new Date(supabaseUser.provider.google.expiry_date));
+  console.log(clockifyUser);
 
-  // const { data: userGoogleCalendars, fetchStatus } = useQuery({
-  //   queryKey: ["calendars"],
-  //   queryFn: () => fetchCalendars(supabaseUser),
-  //   staleTime: Infinity,
-  //   refetchInterval: false,
-  //   enabled: !!supabaseUser?.provider?.google,
-  // });
-  // console.log(userGoogleCalendars);
+  const {
+    data: supabaseUser,
+    refetch: refetchSupabaseUser,
+    isFetching: isLoadingSupabaseUser,
+  } = useQuery({
+    queryKey: ["user"],
+    queryFn: () => fetchUser(jwt, clockifyUser),
+    staleTime: Infinity,
+    refetchInterval: false,
+    enabled: !!clockifyUser,
+  });
+
+  console.log(supabaseUser);
 
   let pca: PublicClientApplication;
   pca = new PublicClientApplication({
@@ -86,100 +104,50 @@ export default function ProbaTest(oauth2Client: any) {
 
   let b: any;
 
-  const { data: googleCalendars, refetch: refetchGoogleCalendars } = useQuery({
+  const {
+    data: googleCalendars,
+    refetch: refetchGoogleCalendars,
+    isFetching: isLoadingGoogleCalendars,
+  } = useQuery({
     queryKey: ["calendars"],
-    queryFn: async () => {
-      let scopedUser = queryClient.getQueryData(["user"]) as any;
-
-      if (scopedUser.provider?.google.expiry_date < new Date()) {
-        let response = await axiosInstance.post(
-          "https://herring-endless-firmly.ngrok-free.app/api/auth/refresh",
-          {
-            refreshToken: scopedUser.provider.google.refresh_token,
-          }
-        );
-        const supabase = createClient();
-        let newAuthObject = response.data;
-
-        let updatedUser = await supabase
-          .from("users")
-          .update({
-            provider: {
-              ...scopedUser.provider,
-              ...{ google: newAuthObject },
-            },
-          })
-          .eq("id", jwt.user as string)
-          .select("*");
-        if (updatedUser?.data) {
-          scopedUser = updatedUser.data[0];
-          queryClient.setQueryData(["user"], updatedUser.data[0]);
-        }
-      }
-      let response = axiosInstance.get(
-        "https://www.googleapis.com/calendar/v3/users/me/calendarList",
-        {
-          headers: {
-            Authorization: `${scopedUser.provider.google.token_type} ${scopedUser.provider.google.access_token}`,
-          },
-        }
-      );
-
-      return (await response).data;
-    },
+    queryFn: () => fetchGoogleCalendars(jwt, queryClient),
     staleTime: Infinity,
     refetchInterval: false,
-    enabled: !!supabaseUser?.provider?.google,
+    enabled: !!supabaseUser?.provider?.google?.auth,
   });
   console.log(googleCalendars);
+
+  const { mutate: timeEntriesSync, isPending } = useMutation({
+    // queryKey: ["timeEntriesSync"],
+    mutationFn: ({ calendar, type }: { calendar: string; type: string }) =>
+      timeEntriesSyncMutation(
+        jwt,
+        searchParams.get("auth_token") as string,
+        queryClient,
+        (form.getValues() as any)[type],
+        calendar,
+        type
+      ),
+    onSuccess: async (codeResponse) => {
+      console.log(codeResponse);
+    },
+    onError: (error) => {
+      console.log(error);
+      form.setValue("googleTimeEntry", !form.getValues().googleTimeEntry);
+    },
+  });
 
   useEffect(() => {
     const initializeMsal = async () => {
       b = await pca.initialize(); // Initialize MSAL instance
-      // setInitialized(true);
-      console.log(b);
-      // console.log(pca.loginPopup());
       setInited(true);
     };
     initializeMsal();
-    // const jwt = jwtDecode(searchParams.get("auth_token") as string) as any;
-    // setAuthToken(jwt);
   }, []);
-
-  useEffect(() => {
-    const supabase = createClient();
-    // const jwt = jwtDecode(searchParams.get("auth_token") as string) as any;
-    // console.log(jwt);
-
-    // supabase
-    //   .from("users")
-    //   .select()
-    //   .eq("id", jwt.user as string)
-    //   .then(async (res) => {
-    //     console.log(res);
-    //     if (!res.data?.length) {
-    //       console.log("no user");
-
-    //       let a = await supabase.from("users").insert({
-    //         id: jwt.user as string,
-    //         first_name: "test",
-    //       });
-    //       console.log(a);
-    //     }
-    //     if (res.data) {
-    //       setActiveUser(res?.data[0]);
-    //     }
-    //   });
-  }, []);
-
-  const { instance, accounts, inProgress } = useMsal();
-
-  const tet = useSearchParams();
 
   async function azureLogin() {
     await pca.initialize();
     let a = await pca.loginPopup();
-    console.log(a);
     const supabase = createClient();
     const jwt = jwtDecode(searchParams.get("auth_token") as string) as any;
 
@@ -230,7 +198,16 @@ export default function ProbaTest(oauth2Client: any) {
           .update({
             provider: {
               ...exisingUser.provider,
-              ...{ google: tokens.data },
+              ...{
+                google: {
+                  auth: tokens.data,
+                  sync: {
+                    googleTimeEntry: false,
+                    googleTimeOff: false,
+                    googleScheduledTime: false,
+                  },
+                },
+              },
             },
           })
           .eq("id", jwt.user as string)
@@ -245,58 +222,6 @@ export default function ProbaTest(oauth2Client: any) {
     onError: (errorResponse) => console.log(errorResponse),
     onNonOAuthError: (errorResponse) => console.log(errorResponse),
   });
-
-  function check() {
-    if (!token || token.expiry_date) return;
-    console.log(token);
-    console.log(new Date(token?.expiry_date ?? "") < new Date());
-  }
-
-  function getCalendars() {
-    if (!token) {
-      return;
-    }
-    console.log(token);
-
-    axiosInstance
-      .get("https://www.googleapis.com/calendar/v3/users/me/calendarList", {
-        headers: {
-          Authorization: `${token.token_type} ${token.access_token}`,
-        },
-      })
-      .then((res) => {
-        console.log(res);
-      })
-      .catch((e) => {
-        console.log(e);
-      });
-  }
-
-  function createCalendar() {
-    if (!token) {
-      return;
-    }
-    console.log(token);
-
-    axiosInstance
-      .post(
-        "https://www.googleapis.com/calendar/v3/calendars",
-        {
-          summary: "test calendar title",
-        },
-        {
-          headers: {
-            Authorization: `${token.token_type} ${token.access_token}`,
-          },
-        }
-      )
-      .then((res) => {
-        console.log(res);
-      })
-      .catch((e) => {
-        console.log(e);
-      });
-  }
 
   function getCalendar() {
     if (!token) {
@@ -482,9 +407,15 @@ export default function ProbaTest(oauth2Client: any) {
         console.log(e);
       });
   }
+  const loadingArray = [
+    isLoadingGoogleCalendars,
+    isLoadingSupabaseUser,
+    isPending,
+  ];
 
   return (
     <div className="flex flex-col items-start p-28 gap-12">
+      {loadingArray.some((el) => el) && <div className="h-20">loading</div>}
       <div>
         <div className="flex flex-row gap-4 items-center">
           <Form {...form}>
@@ -494,18 +425,59 @@ export default function ProbaTest(oauth2Client: any) {
             >
               <FormField
                 control={form.control}
-                name="timeEntry"
+                name="googleTimeEntry"
                 render={({ field }) => (
                   <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                     <div className="space-y-0.5">
-                      <FormLabel>Marketing emails</FormLabel>
+                      <FormLabel>Time entry</FormLabel>
                     </div>
                     <FormControl>
                       <Switch
                         checked={field.value}
                         onCheckedChange={(e) => {
                           field.onChange(e);
-                          console.log(e);
+                          timeEntriesSync({
+                            calendar: "Google",
+                            type: field.name,
+                          });
+                        }}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="googleTimeOff"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                    <div className="space-y-0.5">
+                      <FormLabel>Time off</FormLabel>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={(e) => {
+                          field.onChange(e);
+                        }}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="googleScheduledTime"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                    <div className="space-y-0.5">
+                      <FormLabel>Scheduled time</FormLabel>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={(e) => {
+                          field.onChange(e);
                         }}
                       />
                     </FormControl>
@@ -518,32 +490,18 @@ export default function ProbaTest(oauth2Client: any) {
           <Button
             onClick={googleLogin}
             className={`${
-              supabaseUser && supabaseUser?.provider?.google
-                ? "bg-blue-600"
-                : "bg-green-600"
+              supabaseUser && supabaseUser?.provider?.google?.auth
+                ? "bg-green-600"
+                : "bg-blue-600"
             }`}
           >
-            {supabaseUser && supabaseUser?.provider?.google
+            {supabaseUser && supabaseUser?.provider?.google?.auth
               ? "Connected"
               : "Connect"}
-            {void console.log(supabaseUser)}
           </Button>
         </div>
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-row gap-4 items-center">
-            <Switch />
-            <Label htmlFor="airplane-mode">Time entries</Label>
-          </div>
-          <div className="flex flex-row gap-4 items-center">
-            <Switch />
-            <Label htmlFor="airplane-mode">Time off</Label>
-          </div>
-          <div className="flex flex-row gap-4 items-center">
-            <Switch />
-            <Label htmlFor="airplane-mode">Scheduled Time</Label>
-          </div>
-        </div>
       </div>
+
       <div>
         <div className="flex flex-row gap-4 items-center">
           Azure Calendar
@@ -551,8 +509,8 @@ export default function ProbaTest(oauth2Client: any) {
             onClick={azureLogin}
             className={`${
               supabaseUser && supabaseUser?.provider?.azure
-                ? "bg-blue-600"
-                : "bg-green-600"
+                ? "bg-green-600"
+                : "bg-blue-600"
             }`}
           >
             {supabaseUser && supabaseUser?.provider?.azure
@@ -576,13 +534,12 @@ export default function ProbaTest(oauth2Client: any) {
         </div>
       </div>
       <div className="flex flex-row gap-4">
-        {activeUser && !activeUser?.provider?.google && (
+        {activeUser && !activeUser?.provider?.google?.auth && (
           <Button onClick={googleLogin}>Login</Button>
         )}
         {activeUser && !activeUser?.provider?.azure && (
           <Button onClick={async () => {}}>Azure Login</Button>
         )}
-        <Button onClick={check}>Check</Button>
         <Button
           onClick={() => {
             refetchGoogleCalendars();
@@ -590,7 +547,6 @@ export default function ProbaTest(oauth2Client: any) {
         >
           List Calendars
         </Button>
-        <Button onClick={createCalendar}>Create Calendar</Button>
         <Button onClick={createEvent}>Create Event</Button>
         <Button onClick={getCalendar}>Get Calendar</Button>
         <Button onClick={getTimeEntries}>TimeEntries</Button>
@@ -604,12 +560,12 @@ export default function ProbaTest(oauth2Client: any) {
 
             const activeAccount = pca.getActiveAccount();
             // pca.acquireTokenSilent()
-            console.log(activeAccount);
           }}
         >
           get active user
         </Button>
       </div>
+      {/* <QueryTestComp /> */}
     </div>
   );
 }
