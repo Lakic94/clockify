@@ -27,11 +27,19 @@ export async function GET(request: Request) {
     webhooks: [
       {
         event: "NEW_TIME_ENTRY",
-        path: "/api/webhook/time-entry",
+        path: "/api/webhook/new-time-entry",
       },
       {
-        event: "NEW_TASK",
-        path: "/clockify",
+        event: "TIME_OFF_REQUEST_APPROVED",
+        path: "/api/webhook/time-off-request-approved",
+      },
+      {
+        event: "TIMER_STOPPED",
+        path: "/api/webhook/timer-stopped",
+      },
+      {
+        event: "ASSIGNMENT_PUBLISHED",
+        path: "/api/webhook/assignment-published",
       },
     ],
     components: [

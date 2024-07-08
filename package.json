@@ -23,6 +23,7 @@
     "axios": "^1.6.8",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
+    "date-fns": "^3.6.0",
     "gapi-script": "^1.2.0",
     "google-auth-library": "^9.7.0",
     "googleapis": "^132.0.0",
