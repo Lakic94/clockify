@@ -32,6 +32,7 @@ export default function ProbaTest() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   let jwt: any;
+
   if (searchParams?.get("auth_token")) {
     jwt = jwtDecode(searchParams?.get("auth_token") ?? "");
   }

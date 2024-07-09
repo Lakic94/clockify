@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const baseUrl = "https://herring-endless-firmly.ngrok-free.app";
+const baseUrl = "https://clockify-hczjsftcl-lakic94s-projects.vercel.app";
 export async function GET(request: Request) {
   console.log(request);
 
