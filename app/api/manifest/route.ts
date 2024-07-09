@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const baseUrl = "https://clockify-hczjsftcl-lakic94s-projects.vercel.app";
+const baseUrl = "https://clockify-git-master-lakic94s-projects.vercel.app";
 export async function GET(request: Request) {
   console.log(request);
 
