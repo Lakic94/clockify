@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/client";
 import axiosInstance from "./axiosInterceptorInstance";
-import { QueryClient, useQueryClient } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
 import { ClockifyToken } from "@/lib/models/clockify-token";
 import { subMonths, addYears, addHours, parse, formatISO } from "date-fns";
 
