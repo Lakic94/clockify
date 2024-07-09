@@ -30,10 +30,11 @@ import Loading from "@/components/loading";
 
 export default function ProbaTest() {
   const queryClient = useQueryClient();
-
   const searchParams = useSearchParams();
-
-  const jwt = jwtDecode(searchParams?.get("auth_token") as string) as any;
+  let jwt: any;
+  if (searchParams?.get("auth_token")) {
+    jwt = jwtDecode(searchParams?.get("auth_token") ?? "");
+  }
 
   const formSchema = z.object({
     googleTimeEntry: z.boolean().default(false),
