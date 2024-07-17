@@ -379,13 +379,13 @@ export default function ProbaTest() {
             </Form>
           </div>
 
-          <Button
+          {/* <Button
             onClick={() => {
               detailedReport();
             }}
           >
             Detailed Report
-          </Button>
+          </Button> */}
 
           {/* <div>
             <div className="flex flex-row gap-4 items-center">

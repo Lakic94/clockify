@@ -73,6 +73,7 @@ export async function POST(request: Request, response: Response) {
       `https://www.googleapis.com/calendar/v3/calendars/${scopedUser.provider.google.calendarId}/events`,
       {
         summary: body.note,
+        colorId: "6",
         start: {
           dateTime: start,
         },
