@@ -69,9 +69,9 @@ export const fetchGoogleCalendars = async (
 
   if (scopedUser.provider?.google.auth.expiry_date < new Date()) {
     let response = await axiosInstance.post(
-      process.env.NODE_ENV === "development"
+      (process.env.NODE_ENV === "development"
         ? "https://herring-endless-firmly.ngrok-free.app"
-        : "https://clockify-lakic94s-projects.vercel.app" + "/api/auth/refresh",
+        : "https://clockify-lakic94s-projects.vercel.app") + "/api/auth/refresh",
 
       {
         refreshToken: scopedUser.provider.google.auth.refresh_token,

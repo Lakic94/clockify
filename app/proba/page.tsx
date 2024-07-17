@@ -87,9 +87,9 @@ export default function ProbaTest() {
     auth: {
       clientId: "105e00b0-cea0-472f-95ae-399b96679df6",
       redirectUri:
-        process.env.NODE_ENV === "development"
+        (process.env.NODE_ENV === "development"
           ? "https://herring-endless-firmly.ngrok-free.app"
-          : "https://clockify-lakic94s-projects.vercel.app" + "/api/auth/azure",
+          : "https://clockify-lakic94s-projects.vercel.app") + "/api/auth/azure",
     },
   });
 
@@ -225,10 +225,16 @@ export default function ProbaTest() {
       "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.events.readonly",
     flow: "auth-code",
     onSuccess: async (codeResponse) => {
-      const tokens = await axiosInstance.post(
-        process.env.NODE_ENV === "development"
+      console.log(
+        (process.env.NODE_ENV === "development"
           ? "https://herring-endless-firmly.ngrok-free.app"
-          : "https://clockify-lakic94s-projects.vercel.app" + "/api/auth",
+          : "https://clockify-lakic94s-projects.vercel.app") + "/api/auth"
+      );
+
+      const tokens = await axiosInstance.post(
+        (process.env.NODE_ENV === "development"
+          ? "https://herring-endless-firmly.ngrok-free.app"
+          : "https://clockify-lakic94s-projects.vercel.app") + "/api/auth",
         {
           code: codeResponse.code,
         }
