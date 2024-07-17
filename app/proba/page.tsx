@@ -87,7 +87,9 @@ export default function ProbaTest() {
     auth: {
       clientId: "105e00b0-cea0-472f-95ae-399b96679df6",
       redirectUri:
-        "https://herring-endless-firmly.ngrok-free.app/api/auth/azure",
+        process.env.NODE_ENV === "development"
+          ? "https://herring-endless-firmly.ngrok-free.app"
+          : "https://clockify-lakic94s-projects.vercel.app" + "/api/auth/azure",
     },
   });
 
@@ -224,7 +226,9 @@ export default function ProbaTest() {
     flow: "auth-code",
     onSuccess: async (codeResponse) => {
       const tokens = await axiosInstance.post(
-        "https://herring-endless-firmly.ngrok-free.app/api/auth",
+        process.env.NODE_ENV === "development"
+          ? "https://herring-endless-firmly.ngrok-free.app"
+          : "https://clockify-lakic94s-projects.vercel.app" + "/api/auth",
         {
           code: codeResponse.code,
         }

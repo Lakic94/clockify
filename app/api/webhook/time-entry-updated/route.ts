@@ -27,7 +27,10 @@ export async function POST(request: Request, response: Response) {
   ) {
     if (user.data[0].provider?.google.auth.expiry_date < new Date()) {
       let response = await axios.post(
-        "https://herring-endless-firmly.ngrok-free.app/api/auth/refresh",
+        process.env.NODE_ENV === "development"
+        ? "https://herring-endless-firmly.ngrok-free.app"
+        : "https://clockify-lakic94s-projects.vercel.app" +
+            "/api/auth/refresh",
         {
           refreshToken: user.data[0].provider.google.auth.refresh_token,
         }
