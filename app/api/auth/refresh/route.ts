@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
 
   const user = new UserRefreshClient(
     process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-    process.env.NEXT_PUBLIC_GOOGLE_SECRET,
+    process.env.GOOGLE_SECRET,
     body.refreshToken
   );
 

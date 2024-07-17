@@ -5,7 +5,7 @@ export async function POST(request: NextRequest) {
   let body = await request.json();
   const oAuth2Client = new OAuth2Client(
     process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-    process.env.NEXT_PUBLIC_GOOGLE_SECRET,
+    process.env.GOOGLE_SECRET,
     "postmessage"
   );
 
