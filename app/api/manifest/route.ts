@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
-const baseUrl = "clockify-ec7eixij5-lakic94s-projects.vercel.app";
+const baseUrl =
+  process.env.NODE_ENV === "development"
+    ? "https://herring-endless-firmly.ngrok-free.app"
+    : "https://clockify-silk.vercel.app/";
 export async function GET(request: Request) {
   console.log(request);
 
