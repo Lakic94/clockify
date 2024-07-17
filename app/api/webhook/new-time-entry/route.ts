@@ -7,7 +7,11 @@ export async function POST(request: Request, response: Response) {
   // console.log(request.url, "da to je to", request.body);
   const body = await request.json();
   const supabase = createClient();
-  // console.log(body);
+
+  if (body.type !== "REGULAR") {
+    return NextResponse.json("TIME_OFF_REQUEST");
+  }
+  console.log(body, "new time entry");
 
   let scopedUser = null;
 
@@ -56,17 +60,24 @@ export async function POST(request: Request, response: Response) {
       }
     }
     // console.log(scopedUser.provider.google, "scopedUser");
+    const client = body.project.clientName
+      ? `${body.project?.clientName} : `
+      : "";
+    const project = body.project.name ?? "";
+    const task = body.task?.name ? ` : ${body.task?.name}` : "";
+    const description = body.description ? ` - ${body.description}` : "";
 
     let response = await axios.post(
       `https://www.googleapis.com/calendar/v3/calendars/${scopedUser.provider.google.calendarId}/events`,
       {
-        summary: "Desc",
+        summary: client + project + task + description,
         start: {
           dateTime: body.timeInterval.start,
         },
         end: {
           dateTime: body.timeInterval.end,
         },
+        description: body.id,
       },
       {
         headers: {

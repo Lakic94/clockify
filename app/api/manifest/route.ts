@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const baseUrl = "https://clockify-git-master-lakic94s-projects.vercel.app";
+const baseUrl = "https://herring-endless-firmly.ngrok-free.app";
 export async function GET(request: Request) {
   console.log(request);
 
@@ -38,9 +38,21 @@ export async function GET(request: Request) {
         path: "/api/webhook/timer-stopped",
       },
       {
-        event: "ASSIGNMENT_PUBLISHED",
-        path: "/api/webhook/assignment-published",
+        event: "TIME_ENTRY_UPDATED",
+        path: "/api/webhook/time-entry-updated",
       },
+      {
+        event: "TIME_OFF_REQUESTED",
+        path: "/api/webhook/time-off-requested",
+      },
+      // {
+      //   event: "ASSIGNMENT_PUBLISHED",
+      //   path: "/api/webhook/assignment-published",
+      // },
+      // {
+      //   event: "ASSIGNMENT_UPDATED",
+      //   path: "/api/webhook/assignment-updated",
+      // },
     ],
     components: [
       {

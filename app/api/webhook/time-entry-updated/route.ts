@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/server";
 import axios from "axios";
+import { addHours, formatISO, parse } from "date-fns";
 import { OAuth2Client } from "google-auth-library";
 import { NextResponse } from "next/server";
 
@@ -7,8 +8,8 @@ export async function POST(request: Request, response: Response) {
   // console.log(request.url, "da to je to", request.body);
   const body = await request.json();
   const supabase = createClient();
-  console.log(body, "time off request approved");
-  // return NextResponse.json("response");
+  console.log(body, "time entry updated");
+  // return NextResponse.json("res");
   let scopedUser = null;
 
   const user = await supabase
@@ -19,14 +20,11 @@ export async function POST(request: Request, response: Response) {
     return;
   }
   scopedUser = user.data[0];
-  console.log(
-    user.data[0].provider?.google?.sync?.googleTimeOff?.value,
-    "user.data[0]"
-  );
 
-  if (user.data && user.data[0].provider?.google?.sync?.googleTimeOff?.value) {
-    // console.log(user.data[0], 'user.data[0]');
-
+  if (
+    user.data &&
+    user.data[0].provider?.google?.sync?.googleTimeEntry?.value
+  ) {
     if (user.data[0].provider?.google.auth.expiry_date < new Date()) {
       let response = await axios.post(
         "https://herring-endless-firmly.ngrok-free.app/api/auth/refresh",
@@ -56,27 +54,9 @@ export async function POST(request: Request, response: Response) {
         scopedUser = updatedUser.data[0];
       }
     }
-    console.log(scopedUser.provider.google, "scopedUser");
 
-    let start = body.timeOffPeriod.period.start;
-    let end = body.timeOffPeriod.period.end;
-
-    if (body.timeOffPeriod?.halfDay) {
-      start = body.timeOffPeriod.halfDayHours.start;
-      end = body.timeOffPeriod.halfDayHours.end;
-    }
-
-    let response = await axios.post(
-      `https://www.googleapis.com/calendar/v3/calendars/${scopedUser.provider.google.calendarId}/events`,
-      {
-        summary: body.note,
-        start: {
-          dateTime: start,
-        },
-        end: {
-          dateTime: end,
-        },
-      },
+    let response = await axios.get(
+      `https://www.googleapis.com/calendar/v3/calendars/${scopedUser.provider.google.calendarId}/events?q=${body.id}`,
       {
         headers: {
           Authorization: `${scopedUser.provider.google.auth.token_type} ${scopedUser.provider.google.auth.access_token}`,
@@ -85,7 +65,36 @@ export async function POST(request: Request, response: Response) {
     );
 
     console.log(response.data);
-    return NextResponse.json(response.data);
+
+    const urlParams = new URLSearchParams(response.data.items[0].htmlLink);
+    console.log(urlParams, "urlParams");
+
+    const myParam = urlParams.get("https://www.google.com/calendar/event?eid");
+    console.log(myParam, "myParam");
+    // return NextResponse.json("response.data");
+
+    try {
+      let response1 = await axios.patch(
+        `https://www.googleapis.com/calendar/v3/calendars/${scopedUser.provider.google.calendarId}/events/${response.data.items[0].id}`,
+        {
+          start: {
+            dateTime: body.timeInterval.start,
+          },
+          end: {
+            dateTime: body.timeInterval.end,
+          },
+        },
+        {
+          headers: {
+            Authorization: `${scopedUser.provider.google.auth.token_type} ${scopedUser.provider.google.auth.access_token}`,
+          },
+        }
+      );
+      console.log(response1.data, "response1.data");
+      return NextResponse.json("response.data");
+    } catch (error) {
+      console.log((error as any).message, "error");
+    }
   }
 
   return NextResponse.json("installed");

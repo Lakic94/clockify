@@ -7,8 +7,12 @@ export async function POST(request: Request, response: Response) {
   // console.log(request.url, "da to je to", request.body);
   const body = await request.json();
   const supabase = createClient();
-  console.log(body, "time off request approved");
+  console.log(body, "time off requested");
   // return NextResponse.json("response");
+  if (body.status.statusType !== "APPROVED") {
+    return NextResponse.json("time off requested");
+  }
+
   let scopedUser = null;
 
   const user = await supabase

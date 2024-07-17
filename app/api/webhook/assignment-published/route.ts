@@ -12,6 +12,8 @@ export async function POST(request: Request, response: Response) {
   // return NextResponse.json("res");
   let scopedUser = null;
 
+  console.log(1);
+
   const user = await supabase
     .from("users")
     .select()
@@ -20,11 +22,13 @@ export async function POST(request: Request, response: Response) {
     return;
   }
   scopedUser = user.data[0];
+  console.log(2);
 
   if (
     user.data &&
     user.data[0].provider?.google?.sync?.googleScheduledTime?.value
   ) {
+    console.log(3);
     if (user.data[0].provider?.google.auth.expiry_date < new Date()) {
       let response = await axios.post(
         "https://herring-endless-firmly.ngrok-free.app/api/auth/refresh",
@@ -33,6 +37,7 @@ export async function POST(request: Request, response: Response) {
         }
       );
       let newAuthObject = response.data;
+      console.log(4);
 
       let updatedUser = await supabase
         .from("users")
@@ -54,17 +59,30 @@ export async function POST(request: Request, response: Response) {
         scopedUser = updatedUser.data[0];
       }
     }
+    console.log(
+      parse(
+        body.startTime ?? body.period.start,
+        "HH:mm",
+        new Date(body.period.start)
+      )
+    );
+    console.log(5);
 
     const start = formatISO(
-      parse(body.startTime, "HH:mm", new Date(body.period.start))
+      parse(body.startTime ?? "00:00", "HH:mm", new Date(body.period.start))
     );
 
+    console.log(start);
+
     const end = formatISO(addHours(start, body.hoursPerDay));
+
+    console.log(end);
 
     let response = await axios.post(
       `https://www.googleapis.com/calendar/v3/calendars/${scopedUser.provider.google.calendarId}/events`,
       {
         summary: body.note ?? "No title",
+        description: body.id,
         start: {
           dateTime: start,
         },

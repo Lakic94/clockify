@@ -20,6 +20,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  detailedReportMutation,
   fetchGoogleCalendars,
   fetchUser,
   scheduledTimeSyncMutation,
@@ -128,6 +129,20 @@ export default function ProbaTest() {
     },
   });
 
+  const { mutate: detailedReport } = useMutation({
+    // queryKey: ["timeEntriesSync"],
+    mutationFn: () =>
+      detailedReportMutation(
+        jwt,
+        searchParams.get("auth_token") as string,
+        queryClient
+      ),
+    onSuccess: async (codeResponse) => {
+      console.log(codeResponse);
+    },
+    onError: (error) => {},
+  });
+
   const { mutate: scheduledTimeSync, isPending: isScheduledTimePending } =
     useMutation({
       mutationFn: ({ calendar, type }: { calendar: string; type: string }) =>
@@ -204,7 +219,8 @@ export default function ProbaTest() {
   }
 
   const googleLogin = useGoogleLogin({
-    scope: "https://www.googleapis.com/auth/calendar",
+    scope:
+      "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.events.readonly",
     flow: "auth-code",
     onSuccess: async (codeResponse) => {
       const tokens = await axiosInstance.post(
@@ -309,7 +325,7 @@ export default function ProbaTest() {
                   )}
                 />
 
-                <FormField
+                {/* <FormField
                   control={form.control}
                   name="googleScheduledTime"
                   render={({ field }) => (
@@ -331,7 +347,7 @@ export default function ProbaTest() {
                       </FormControl>
                     </FormItem>
                   )}
-                />
+                /> */}
                 <FormField
                   control={form.control}
                   name="googleTimeOff"
@@ -358,6 +374,14 @@ export default function ProbaTest() {
               </form>
             </Form>
           </div>
+
+          <Button
+            onClick={() => {
+              detailedReport();
+            }}
+          >
+            Detailed Report
+          </Button>
 
           {/* <div>
             <div className="flex flex-row gap-4 items-center">

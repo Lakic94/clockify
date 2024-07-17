@@ -2,7 +2,14 @@ import { createClient } from "@/lib/client";
 import axiosInstance from "./axiosInterceptorInstance";
 import { QueryClient } from "@tanstack/react-query";
 import { ClockifyToken } from "@/lib/models/clockify-token";
-import { subMonths, addYears, addHours, parse, formatISO } from "date-fns";
+import {
+  subMonths,
+  addYears,
+  addHours,
+  parse,
+  formatISO,
+  addMonths,
+} from "date-fns";
 
 export const fetchCalendars = async (supabaseUser: any) => {
   localStorage.setItem(
@@ -174,18 +181,42 @@ export const timeEntriesSyncMutation = async (
   }
 
   try {
-    const timeEntries = await axiosInstance.get(
-      `https://developer.clockify.me/api/v1/workspaces/${jwt?.workspaceId}/user/${jwt?.user}/time-entries`,
+    const detailedReport = await axiosInstance.post(
+      `https://developer.clockify.me/report/v1/workspaces/${jwt.workspaceId}/reports/detailed`,
+      {
+        dateRangeEnd: addMonths(new Date(), 1),
+        dateRangeStart: subMonths(new Date(), 1),
+        detailedFilter: {},
+        amountShown: "HIDE_AMOUNT",
+        users: {
+          ids: [jwt.user],
+        },
+      },
       {
         headers: {
           "x-addon-token": authToken,
+          // "X-Api-Key": "YTYwYzRlYTMtM2NmNC00NGEwLWJmYWQtZDRjNGVmZjA2MDRk",
         },
       }
     );
 
-    if (calendar === "Google" && timeEntries.data.length > 0) {
-      await syncWithGoogleCalendar(timeEntries.data, queryClient);
-    } else if (calendar === "Azure" && timeEntries.data.length > 0) {
+    const timeEntries = detailedReport.data.timeentries.filter(
+      (timeEntry: any) => {
+        const client = timeEntry.clientName
+          ? `${timeEntry?.clientName} : `
+          : "";
+        const project = timeEntry.projectName ?? "";
+        const task = timeEntry.taskName ? ` : ${timeEntry.taskName}` : "";
+        const description = timeEntry.description
+          ? ` - ${timeEntry.description}`
+          : "";
+        timeEntry.description = `${client}${project}${task}${description}`;
+        return timeEntry.type === "REGULAR";
+      }
+    );
+    if (calendar === "Google" && timeEntries.length > 0) {
+      await syncWithGoogleCalendar(timeEntries, queryClient);
+    } else if (calendar === "Azure" && timeEntries.length > 0) {
       await syncWithAzureCalendar(timeEntries, queryClient);
     }
   } catch (error) {
@@ -212,6 +243,55 @@ export const timeOffSyncMutation = async (
 
   updateFormStateInDatabase(scopedUser, type, controlValue, jwt, queryClient);
 };
+
+export const detailedReportMutation = async (
+  jwt: ClockifyToken,
+  authToken: string,
+  queryClient: QueryClient
+) => {
+  const detailedReport = await axiosInstance.post(
+    `https://developer.clockify.me/report/v1/workspaces/${jwt.workspaceId}/reports/detailed`,
+    {
+      dateRangeEnd: addMonths(new Date(), 3),
+      dateRangeStart: subMonths(new Date(), 3),
+      detailedFilter: {},
+      amountShown: "HIDE_AMOUNT",
+      users: {
+        ids: [jwt.user],
+      },
+    },
+    {
+      headers: {
+        "x-addon-token": authToken,
+        // "X-Api-Key": "YTYwYzRlYTMtM2NmNC00NGEwLWJmYWQtZDRjNGVmZjA2MDRk",
+      },
+    }
+  );
+
+  console.log(detailedReport.data);
+};
+
+// export const detailedReportMutation = async (
+//   jwt: ClockifyToken,
+//   authToken: string,
+//   queryClient: QueryClient
+// ) => {
+//   const detailedReport = await axiosInstance.get(
+//     `https://developer.clockify.me/pto/v1/workspaces/${jwt.workspaceId}/policies`,
+//     {
+//       headers: {
+//         "x-addon-token": authToken,
+//         // "X-Api-Key": "YTYwYzRlYTMtM2NmNC00NGEwLWJmYWQtZDRjNGVmZjA2MDRk",
+//         "Access-Control-Allow-Headers": "*",
+//         "Access-Control-Allow-Methods": "*,",
+//         "Access-Control-Allow-Origin": "*",
+//         "Access-Control-Expose-Headers": "*",
+//       },
+//     }
+//   );
+
+//   console.log(detailedReport.data);
+// };
 
 export const scheduledTimeSyncMutation = async (
   jwt: ClockifyToken,
@@ -295,6 +375,8 @@ async function syncWithGoogleCalendar(
   const boundary = "batch_google_calendar";
   let combinedBody = "";
   timeEntries.forEach((entrie: any) => {
+    console.log(entrie);
+
     combinedBody += `--${boundary}`;
     combinedBody += `\r\n`;
     combinedBody += `Content-Type: application/http`;
@@ -310,6 +392,7 @@ async function syncWithGoogleCalendar(
 
     combinedBody += `{
   "summary": "${entrie.description}",
+  "description": "${entrie.id}",
   "start": {
     "dateTime": "${entrie.timeInterval.start}"
   },
