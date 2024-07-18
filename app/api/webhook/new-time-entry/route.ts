@@ -7,11 +7,11 @@ export async function POST(request: Request, response: Response) {
   // console.log(request.url, "da to je to", request.body);
   const body = await request.json();
   const supabase = createClient();
+  console.log(body, "new time entry");
 
   if (body.type !== "REGULAR") {
     return NextResponse.json("TIME_OFF_REQUEST");
   }
-  console.log(body, "new time entry");
 
   let scopedUser = null;
 

@@ -74,7 +74,7 @@ export async function POST(request: Request, response: Response) {
           start: {
             dateTime: body.timeInterval.start,
           },
-          end: {
+          end: { 
             dateTime: body.timeInterval.end,
           },
         },
