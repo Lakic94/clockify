@@ -63,7 +63,7 @@ export async function POST(request: Request, response: Response) {
     let response = await axios.post(
       `https://www.googleapis.com/calendar/v3/calendars/${scopedUser.provider.google.calendarId}/events`,
       {
-        summary: body.description ?? "No title",
+        summary:  "No title",
         start: {
           dateTime: body.timeInterval.start,
         },
