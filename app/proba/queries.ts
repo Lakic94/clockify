@@ -71,7 +71,8 @@ export const fetchGoogleCalendars = async (
     let response = await axiosInstance.post(
       (process.env.NODE_ENV === "development"
         ? "https://herring-endless-firmly.ngrok-free.app"
-        : "https://clockify-lakic94s-projects.vercel.app") + "/api/auth/refresh",
+        : "https://clockify-lakic94s-projects.vercel.app") +
+        "/api/auth/refresh",
 
       {
         refreshToken: scopedUser.provider.google.auth.refresh_token,
@@ -122,6 +123,8 @@ export const fetchGoogleCalendars = async (
     return item.summary === "Clockify Addon Calendar";
   });
 
+  let googleCalendar = null;
+
   if (!has) {
     const newCalendar = await axiosInstance.post(
       "https://www.googleapis.com/calendar/v3/calendars",
@@ -135,28 +138,34 @@ export const fetchGoogleCalendars = async (
       }
     );
 
-    let updatedUser = await supabase
-      .from("users")
-      .update({
-        provider: {
-          ...scopedUser.provider,
-          ...{
-            google: {
-              auth: scopedUser.provider.google.auth,
-              sync: scopedUser.provider.google.sync,
-              calendarId: newCalendar.data.id,
-            },
+    googleCalendar = newCalendar.data.id;
+  } else {
+    response.data.items.find((item: any) => {
+      if (item.summary === "Clockify Addon Calendar") {
+        googleCalendar = item.id;
+      }
+    });
+  }
+
+  let updatedUser = await supabase
+    .from("users")
+    .update({
+      provider: {
+        ...scopedUser.provider,
+        ...{
+          google: {
+            auth: scopedUser.provider.google.auth,
+            sync: scopedUser.provider.google.sync,
+            calendarId: googleCalendar,
           },
         },
-      })
-      .eq("id", jwt.user as string)
-      .select("*");
-    if (updatedUser?.data) {
-      scopedUser = updatedUser.data[0];
-      queryClient.setQueryData(["user"], updatedUser.data[0]);
-    }
-
-    return newCalendar.data;
+      },
+    })
+    .eq("id", jwt.user as string)
+    .select("*");
+  if (updatedUser?.data) {
+    scopedUser = updatedUser.data[0];
+    queryClient.setQueryData(["user"], updatedUser.data[0]);
   }
 
   return clockifyCalendar;
