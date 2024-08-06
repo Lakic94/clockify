@@ -4,11 +4,8 @@ import { OAuth2Client } from "google-auth-library";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request, response: Response) {
-  // console.log(request.url, "da to je to", request.body);
   const body = await request.json();
   const supabase = createClient();
-  console.log(body, "time off request approved");
-  // return NextResponse.json("response");
   let scopedUser = null;
 
   const user = await supabase
@@ -19,20 +16,21 @@ export async function POST(request: Request, response: Response) {
     return;
   }
   scopedUser = user.data[0];
-  console.log(
-    user.data[0].provider?.google?.sync?.googleTimeOff?.value,
-    "user.data[0]"
-  );
+
+  if (!scopedUser?.provider?.google?.connected) {
+    console.log("disconnected");
+    return NextResponse.json("disconnected");
+  } else {
+    console.log("connected");
+  }
 
   if (user.data && user.data[0].provider?.google?.sync?.googleTimeOff?.value) {
-    // console.log(user.data[0], 'user.data[0]');
-
     if (user.data[0].provider?.google.auth.expiry_date < new Date()) {
       let response = await axios.post(
         (process.env.NODE_ENV === "development"
-        ? "https://herring-endless-firmly.ngrok-free.app"
-        : "https://clockify-lakic94s-projects.vercel.app") +
-            "/api/auth/refresh",
+          ? "https://herring-endless-firmly.ngrok-free.app"
+          : "https://clockify-lakic94s-projects.vercel.app") +
+          "/api/auth/refresh",
         {
           refreshToken: user.data[0].provider.google.auth.refresh_token,
         }
@@ -49,6 +47,7 @@ export async function POST(request: Request, response: Response) {
                 auth: newAuthObject,
                 sync: user.data[0].provider.google.sync,
                 calendarId: user.data[0].provider.google.calendarId,
+                connected: true,
               },
             },
           },
@@ -73,7 +72,7 @@ export async function POST(request: Request, response: Response) {
       `https://www.googleapis.com/calendar/v3/calendars/${scopedUser.provider.google.calendarId}/events`,
       {
         summary: body.note,
-        colorId: "6",
+        colorId: "2",
         start: {
           dateTime: start,
         },

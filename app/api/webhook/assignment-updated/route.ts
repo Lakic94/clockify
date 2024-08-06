@@ -21,6 +21,13 @@ export async function POST(request: Request, response: Response) {
   }
   scopedUser = user.data[0];
 
+  if (!scopedUser?.provider?.google?.connected) {
+    console.log("disconnected");
+    return NextResponse.json("disconnected");
+  } else {
+    console.log("connected");
+  }
+
   if (
     user.data &&
     user.data[0].provider?.google?.sync?.googleScheduledTime?.value
@@ -47,6 +54,7 @@ export async function POST(request: Request, response: Response) {
                 auth: newAuthObject,
                 sync: user.data[0].provider.google.sync,
                 calendarId: user.data[0].provider.google.calendarId,
+                connected: true,
               },
             },
           },

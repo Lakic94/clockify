@@ -90,6 +90,7 @@ export const fetchGoogleCalendars = async (
               auth: newAuthObject,
               sync: scopedUser.provider.google.sync,
               calendarId: scopedUser.provider.google.calendarId,
+              connected: true,
             },
           },
         },
@@ -157,6 +158,7 @@ export const fetchGoogleCalendars = async (
             auth: scopedUser.provider.google.auth,
             sync: scopedUser.provider.google.sync,
             calendarId: googleCalendar,
+            connected: true,
           },
         },
       },
@@ -466,6 +468,36 @@ async function updateFormStateInDatabase(
               },
             },
             calendarId: scopedUser.provider.google.calendarId,
+            connected: true,
+          },
+        },
+      },
+    })
+    .eq("id", jwt.user)
+    .select("*");
+
+  if (updatedUser?.data) {
+    queryClient.setQueryData(["user"], updatedUser.data[0]);
+  }
+}
+
+export async function disconnectUserFromCalendar(
+  jwt: ClockifyToken,
+  scopedUser: any,
+  queryClient: any
+) {
+  const supabase = createClient();
+  let updatedUser = await supabase
+    .from("users")
+    .update({
+      provider: {
+        ...scopedUser.provider,
+        ...{
+          google: {
+            auth: scopedUser.provider.google.auth,
+            sync: scopedUser.provider.google.sync,
+            calendarId: scopedUser.provider.google.calendarId,
+            connected: false,
           },
         },
       },

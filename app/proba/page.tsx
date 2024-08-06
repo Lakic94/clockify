@@ -21,6 +21,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   detailedReportMutation,
+  disconnectUserFromCalendar,
   fetchGoogleCalendars,
   fetchUser,
   scheduledTimeSyncMutation,
@@ -89,7 +90,8 @@ export default function ProbaTest() {
       redirectUri:
         (process.env.NODE_ENV === "development"
           ? "https://herring-endless-firmly.ngrok-free.app"
-          : "https://clockify-lakic94s-projects.vercel.app") + "/api/auth/azure",
+          : "https://clockify-lakic94s-projects.vercel.app") +
+        "/api/auth/azure",
     },
   });
 
@@ -225,12 +227,6 @@ export default function ProbaTest() {
       "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.events.readonly",
     flow: "auth-code",
     onSuccess: async (codeResponse) => {
-      console.log(
-        (process.env.NODE_ENV === "development"
-          ? "https://herring-endless-firmly.ngrok-free.app"
-          : "https://clockify-lakic94s-projects.vercel.app") + "/api/auth"
-      );
-
       const tokens = await axiosInstance.post(
         (process.env.NODE_ENV === "development"
           ? "https://herring-endless-firmly.ngrok-free.app"
@@ -259,6 +255,7 @@ export default function ProbaTest() {
                     googleTimeOff: { value: false, initialied: false },
                     googleScheduledTime: { value: false, initialied: false },
                   },
+                  connected: true,
                 },
               },
             },
@@ -282,58 +279,97 @@ export default function ProbaTest() {
     isTimeOffSyncPending,
   ];
 
+  const disconnect = async () => {
+    let scopedUser = queryClient.getQueryData(["user"]) as any;
+    let user = await disconnectUserFromCalendar(jwt, scopedUser, queryClient);
+    console.log(user);
+  };
+
+  const connect = async () => {
+    const supabase = createClient();
+    let scopedUser = queryClient.getQueryData(["user"]) as any;
+
+    let updatedUser = await supabase
+      .from("users")
+      .update({
+        provider: {
+          ...scopedUser.provider,
+          ...{
+            google: {
+              auth: scopedUser.provider.google.auth,
+              sync: scopedUser.provider.google.sync,
+              calendarId: scopedUser.provider.google.calendarId,
+              connected: true,
+            },
+          },
+        },
+      })
+      .eq("id", jwt.user)
+      .select("*");
+
+    if (updatedUser?.data) {
+      queryClient.setQueryData(["user"], updatedUser.data[0]);
+    }
+  };
+
   return (
     <div className="flex flex-col items-start p-28 gap-12">
       {loadingArray.some((el) => el) ? (
         <Loading />
       ) : (
-        <div className="flex flex-col gap-12">
+        <div className="flex flex-col gap-12 w-full">
           <div className="flex flex-col gap-4 items-center">
-            <div className="flex flex-row gap-4 items-center">
+            <div className="flex flex-row gap-4 items-center self-start">
               Google Calendar
-              <Button
-                onClick={
-                  supabaseUser && !supabaseUser?.provider?.google?.auth
-                    ? googleLogin
-                    : void 0
-                }
-                className={`${
-                  supabaseUser && supabaseUser?.provider?.google?.auth
-                    ? "bg-green-600"
-                    : "bg-blue-600"
-                }`}
-              >
-                {supabaseUser && supabaseUser?.provider?.google?.auth
-                  ? "Connected"
-                  : "Connect"}
-              </Button>
+              {supabaseUser && !supabaseUser?.provider?.google?.connected ? (
+                <Button
+                  onClick={
+                    supabaseUser?.provider?.google?.auth ? connect : googleLogin
+                  }
+                  className={` bg-blue-600`}
+                >
+                  {"Connect"}
+                </Button>
+              ) : (
+                <Button onClick={disconnect} className={` bg-green-600`}>
+                  Disconnect
+                </Button>
+              )}
             </div>
 
             <Form {...form}>
-              <form className="w-full space-y-6">
-                <FormField
-                  control={form.control}
-                  name="googleTimeEntry"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                      <div className="space-y-0.5">
-                        <FormLabel>Time entry</FormLabel>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={(e) => {
-                            field.onChange(e);
-                            timeEntriesSync({
-                              calendar: "Google",
-                              type: field.name,
-                            });
-                          }}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+              <form className="w-full space-y-6 ">
+                <div className="flex flex-row gap-5 items-center">
+                  <div className="w-1/5">
+                    <FormField
+                      control={form.control}
+                      name="googleTimeEntry"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                          <div className="space-y-0.5">
+                            <FormLabel>Time entry</FormLabel>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={(e) => {
+                                field.onChange(e);
+                                timeEntriesSync({
+                                  calendar: "Google",
+                                  type: field.name,
+                                });
+                              }}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <h1>
+                    Time entries will be displayed in blue color in Google
+                    Calendar
+                  </h1>
+                </div>
 
                 {/* <FormField
                   control={form.control}
@@ -358,72 +394,39 @@ export default function ProbaTest() {
                     </FormItem>
                   )}
                 /> */}
-                <FormField
-                  control={form.control}
-                  name="googleTimeOff"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                      <div className="space-y-0.5">
-                        <FormLabel>Time off</FormLabel>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={(e) => {
-                            field.onChange(e);
-                            timeOffSync({
-                              calendar: "Google",
-                              type: field.name,
-                            });
-                          }}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                <div className="flex flex-row gap-5 items-center">
+                  <div className="w-1/5">
+                    <FormField
+                      control={form.control}
+                      name="googleTimeOff"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                          <div className="space-y-0.5">
+                            <FormLabel>Time off</FormLabel>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={(e) => {
+                                field.onChange(e);
+                                timeOffSync({
+                                  calendar: "Google",
+                                  type: field.name,
+                                });
+                              }}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <h1>
+                    Time off will be displayed in green color in Google Calendar
+                  </h1>
+                </div>
               </form>
             </Form>
           </div>
-
-          {/* <Button
-            onClick={() => {
-              detailedReport();
-            }}
-          >
-            Detailed Report
-          </Button> */}
-
-          {/* <div>
-            <div className="flex flex-row gap-4 items-center">
-              Azure Calendar
-              <Button
-                onClick={azureLogin}
-                className={`${
-                  supabaseUser && supabaseUser?.provider?.azure
-                    ? "bg-green-600"
-                    : "bg-blue-600"
-                }`}
-              >
-                {supabaseUser && supabaseUser?.provider?.azure
-                  ? "Connected"
-                  : "Connect"}
-              </Button>
-            </div>
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-row gap-4 items-center">
-                <Switch />
-                <Label htmlFor="airplane-mode">Time entries</Label>
-              </div>
-              <div className="flex flex-row gap-4 items-center">
-                <Switch />
-                <Label htmlFor="airplane-mode">Time off</Label>
-              </div>
-              <div className="flex flex-row gap-4 items-center">
-                <Switch />
-                <Label htmlFor="airplane-mode">Scheduled Time</Label>
-              </div>
-            </div>
-          </div> */}
         </div>
       )}
     </div>
